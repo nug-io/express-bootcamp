@@ -1,0 +1,66 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum BatchStatus {
+  OPEN
+  CLOSED
+  ONGOING
+  FINISHED
+}
+
+model User {
+  id            Int          @id @default(autoincrement())
+  name          String
+  email         String       @unique
+  phone_number  String?
+  password_hash String
+  role          Role         @default(USER)
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+  enrollments   Enrollment[]
+}
+
+model Batch {
+  id          Int          @id @default(autoincrement())
+  title       String
+  start_date  DateTime
+  end_date    DateTime
+  price       Decimal      @db.Decimal(10, 2)
+  status      BatchStatus  @default(OPEN)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  enrollments Enrollment[]
+  materials   Material[]
+}
+
+model Enrollment {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  batch_id    Int
+  enrolled_at DateTime @default(now())
+  user        User     @relation(fields: [user_id], references: [id])
+  batch       Batch    @relation(fields: [batch_id], references: [id])
+
+  @@unique([user_id, batch_id])
+}
+
+model Material {
+  id         Int      @id @default(autoincrement())
+  title      String
+  content    String   @db.Text
+  batch_id   Int
+  order      Int
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  batch      Batch    @relation(fields: [batch_id], references: [id])
+}
