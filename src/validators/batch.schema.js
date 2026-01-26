@@ -1,9 +1,16 @@
 import { z } from 'zod';
 
+const dateSchema = z.preprocess((val) => {
+    if (typeof val === 'string') {
+        return new Date(val)
+    }
+    return val
+}, z.date())
+
 export const createBatchSchema = z.object({
     title: z.string().min(3),
-    start_date: z.string().datetime(), // ISO 8601
-    end_date: z.string().datetime(),
+    start_date: dateSchema,
+    end_date: dateSchema,
     price: z.number().positive(),
     status: z.enum(['OPEN', 'CLOSED', 'ONGOING', 'FINISHED']).optional(),
 });

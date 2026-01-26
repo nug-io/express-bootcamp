@@ -22,7 +22,7 @@ model User {
   id            Int          @id @default(autoincrement())
   name          String
   email         String       @unique
-  phone_number  String?
+  phone_number  String
   password_hash String
   role          Role         @default(USER)
   created_at    DateTime     @default(now())
@@ -35,7 +35,7 @@ model Batch {
   title       String
   start_date  DateTime
   end_date    DateTime
-  price       Decimal      @db.Decimal(10, 2)
+  price       Int
   status      BatchStatus  @default(OPEN)
   created_at  DateTime     @default(now())
   updated_at  DateTime     @updatedAt

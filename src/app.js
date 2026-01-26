@@ -26,10 +26,10 @@ app.get('/', (req, res) => {
 });
 
 app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
-app.use('/batches', batchRoutes);
+app.use('/user', userRoutes);
+app.use('/batch', batchRoutes);
 app.use('/enrollment', enrollmentRoutes);
-app.use('/materials', materialRoutes);
+app.use('/material', materialRoutes);
 
 app.use(errorHandler);
 
