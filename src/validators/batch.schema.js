@@ -17,8 +17,8 @@ export const createBatchSchema = z.object({
 
 export const updateBatchSchema = z.object({
     title: z.string().min(3).optional(),
-    start_date: z.string().datetime().optional(),
-    end_date: z.string().datetime().optional(),
+    start_date: dateSchema.optional(),
+    end_date: dateSchema.optional(),
     price: z.number().positive().optional(),
     status: z.enum(['OPEN', 'CLOSED', 'ONGOING', 'FINISHED']).optional(),
 });
