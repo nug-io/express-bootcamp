@@ -1,0 +1,26 @@
+services:
+  api:
+    container_name: express-bootcamp
+    build: .
+    image: express-bootcamp:1.0
+    restart: unless-stopped
+
+    env_file:
+      - .env.production
+
+    ports:
+      - "127.0.0.1:4001:4001"
+
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

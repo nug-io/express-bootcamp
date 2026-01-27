@@ -21,15 +21,15 @@ app.use(cookieParser());
 
 app.use(requestLogger);
 
-app.get('/', (req, res) => {
+app.get(['/api', '/api/'], (req, res) => {
     res.json({ message: 'Bootcamp API is running' });
 });
 
-app.use('/auth', authRoutes);
-app.use('/user', userRoutes);
-app.use('/batch', batchRoutes);
-app.use('/enrollment', enrollmentRoutes);
-app.use('/material', materialRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/batch', batchRoutes);
+app.use('/api/enrollment', enrollmentRoutes);
+app.use('/api/material', materialRoutes);
 
 app.use(errorHandler);
 
