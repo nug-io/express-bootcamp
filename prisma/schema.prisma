@@ -12,10 +12,8 @@ enum Role {
 }
 
 enum BatchStatus {
-  OPEN
+  ACTIVE
   CLOSED
-  ONGOING
-  FINISHED
 }
 
 model User {
@@ -36,7 +34,8 @@ model Batch {
   start_date  DateTime
   end_date    DateTime
   price       Int
-  status      BatchStatus  @default(OPEN)
+  quota       Int
+  status      BatchStatus  @default(ACTIVE)
   created_at  DateTime     @default(now())
   updated_at  DateTime     @updatedAt
   enrollments Enrollment[]

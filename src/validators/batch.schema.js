@@ -12,7 +12,7 @@ export const createBatchSchema = z.object({
     start_date: dateSchema,
     end_date: dateSchema,
     price: z.number().positive(),
-    status: z.enum(['OPEN', 'CLOSED', 'ONGOING', 'FINISHED']).optional(),
+    status: z.enum(['ACTIVE', 'CLOSED']).optional(),
 });
 
 export const updateBatchSchema = z.object({
@@ -20,5 +20,5 @@ export const updateBatchSchema = z.object({
     start_date: dateSchema.optional(),
     end_date: dateSchema.optional(),
     price: z.number().positive().optional(),
-    status: z.enum(['OPEN', 'CLOSED', 'ONGOING', 'FINISHED']).optional(),
+    status: z.enum(['ACTIVE', 'CLOSED']).optional(),
 });

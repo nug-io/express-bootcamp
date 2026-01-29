@@ -1,57 +1,52 @@
 import prisma from '../config/db.js';
 import { hashPassword, comparePassword } from '../utils/hash.js';
 import { generateToken } from '../utils/token.js';
+import { throwError } from '../utils/throwError.js';
 
 export const register = async (data) => {
-    const { name, email, password, phone_number } = data;
+  const { name, email, password, phone_number } = data;
 
-    const existingUser = await prisma.user.findUnique({
-        where: { email },
-    });
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  });
 
-    if (existingUser) {
-        const error = new Error('Email already registered');
-        error.status = 409;
-        throw error;
-    }
+  if (existingUser) {
+    throwError('Email already registered', 409);
+  }
 
-    const hashedPassword = await hashPassword(password);
+  const hashedPassword = await hashPassword(password);
 
-    const user = await prisma.user.create({
-        data: {
-            name,
-            email,
-            password_hash: hashedPassword,
-            phone_number,
-            role: 'USER',
-        },
-    });
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      password_hash: hashedPassword,
+      phone_number,
+      role: 'USER',
+    },
+  });
 
-    const token = generateToken({ id: user.id, role: user.role });
+  const token = generateToken({ id: user.id, role: user.role });
 
-    return { user, token };
+  return { user, token };
 };
 
 export const login = async ({ email, password }) => {
-    const user = await prisma.user.findUnique({
-        where: { email },
-    });
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
 
-    if (!user) {
-        const error = new Error('Invalid credentials');
-        error.status = 401;
-        throw error;
-    }
+  if (!user) {
+    throwError('Invalid credentials', 401);
+  }
 
-    const isValid = await comparePassword(password, user.password_hash);
+  const isValid = await comparePassword(password, user.password_hash);
 
-    if (!isValid) {
-        const error = new Error('Invalid credentials');
-        error.status = 401;
-        throw error;
-    }
+  if (!isValid) {
+    throwError('Invalid credentials', 401);
+  }
 
-    const token = generateToken({ id: user.id, role: user.role });
+  const token = generateToken({ id: user.id, role: user.role });
 
-    return { user, token };
+  return { user, token };
 };
