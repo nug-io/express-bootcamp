@@ -1,24 +1,98 @@
 import prisma from '../config/db.js';
-import { throwError } from '../utils/throwError.js';
 import { resolveBatchStatus } from '../utils/batchStatus.js';
 
-export const getAllBatches = async () => {
-  const batches = await prisma.batch.findMany({
-    orderBy: { start_date: 'asc' },
-    include: {
-      _count: {
-        select: { enrollments: true },
+export const getAllBatches = async (query = {}) => {
+  const page = parseInt(query.page) || 1;
+  const limit = parseInt(query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const keyword = query.q?.trim();
+
+  // 1. DB-level filter
+  const where = {
+    ...(keyword && {
+      title: {
+        contains: keyword,
+        mode: 'insensitive',
       },
-    },
+    }),
+  };
+
+  // 2. DB-level orderBy whitelist
+  const allowedOrderBy = {
+    title: true,
+    start_date: true,
+    created_at: true,
+    price: true,
+  };
+
+  const orderField = query.orderBy || 'created_at';
+  const orderDir = query.orderDir === 'asc' ? 'asc' : 'desc';
+
+  const dbOrderBy = allowedOrderBy[orderField]
+    ? [{ [orderField]: orderDir }]
+    : [{ created_at: 'desc' }];
+
+  // 3. Query DB
+  const [batches, total] = await Promise.all([
+    prisma.batch.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: dbOrderBy,
+      include: {
+        _count: {
+          select: { enrollments: true },
+        },
+      },
+    }),
+    prisma.batch.count({ where }),
+  ]);
+
+  // 4. Enrich (computed fields)
+  let result = batches.map((batch) => {
+    const enrolledCount = batch._count.enrollments;
+    const remainingQuota = batch.quota - enrolledCount;
+
+    return {
+      ...batch,
+      status_effective: resolveBatchStatus(batch),
+      enrolled_count: enrolledCount,
+      remaining_quota: remainingQuota,
+      is_full: remainingQuota <= 0,
+    };
   });
 
-  // tambahkan status & info kuota (computed, bukan DB)
-  return batches.map((batch) => ({
-    ...batch,
-    status_effective: resolveBatchStatus(batch),
-    enrolled_count: batch._count.enrollments,
-    is_full: batch._count.enrollments >= batch.quota,
-  }));
+  // 5. App-level filter (computed)
+  if (query.status) {
+    result = result.filter((b) => b.status_effective === query.status);
+  }
+
+  if (query.is_full !== undefined) {
+    const isFull = query.is_full === 'true';
+    result = result.filter((b) => b.is_full === isFull);
+  }
+
+  // 6. App-level orderBy (computed)
+  if (query.orderBy === 'remaining_quota') {
+    result.sort((a, b) =>
+      orderDir === 'asc'
+        ? a.remaining_quota - b.remaining_quota
+        : b.remaining_quota - a.remaining_quota
+    );
+  }
+
+  return {
+    data: result,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      orderBy: query.orderBy || 'created_at',
+      orderDir,
+    },
+  };
 };
 
 export const getBatchById = async (id) => {

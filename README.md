@@ -104,25 +104,121 @@ Get details of the currently logged-in user.
 ### 3. Batch
 
 #### List Batches
-Get a list of all available bootcamp batches.
 
-- **Method**: `GET`
-- **Path**: `/batch`
-- **Auth**: Public
-- **Success Response** (200 OK):
-  ```json
-  {
-    "data": [
-      {
-        "id": 1,
-        "title": "Fullstack Batch 1",
-        "start_date": "2026-02-10T00:00:00.000Z",
-        "price": "5000000",
-        "status": "OPEN"
-      }
-    ]
+Get a list of bootcamp batches with pagination, filters, and custom sorting.
+
+* **Method**: `GET`
+* **Path**: `/batch`
+* **Auth**: Public
+
+---
+
+##### Query Parameters (Optional)
+
+| Name       | Type    | Description                                                                  |
+| ---------- | ------- | ---------------------------------------------------------------------------- |
+| `page`     | number  | Page number (default: `1`)                                                   |
+| `limit`    | number  | Items per page (default: `10`)                                               |
+| `q`        | string  | Search batch by title                                                        |
+| `status`   | string  | Filter by status (`OPEN`, `ONGOING`, `FINISHED`, `CLOSED`)                   |
+| `is_full`  | boolean | Filter by quota availability                                                 |
+| `orderBy`  | string  | Sort field (`title`, `start_date`, `created_at`, `price`, `remaining_quota`) |
+| `orderDir` | string  | Sort direction (`asc` or `desc`, default: `desc`)                            |
+
+---
+
+##### Status Definition
+
+| Status     | Condition                              |
+| ---------- | -------------------------------------- |
+| `OPEN`     | `ACTIVE` + now < start_date            |
+| `ONGOING`  | `ACTIVE` + start_date ≤ now ≤ end_date |
+| `FINISHED` | `ACTIVE` + now > end_date              |
+| `CLOSED`   | status = `CLOSED`                      |
+
+---
+
+##### Sorting Rules
+
+* DB-level sorting:
+
+  * `title`
+  * `start_date`
+  * `created_at`
+  * `price`
+* App-level sorting (computed):
+
+  * `remaining_quota` (`quota - enrolled_count`)
+
+> `remaining_quota` is **computed**, therefore sorted in application layer after pagination.
+
+---
+
+##### Success Response (200 OK)
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "title": "Fullstack Batch 1",
+      "start_date": "2026-02-10T00:00:00.000Z",
+      "end_date": "2026-03-10T00:00:00.000Z",
+      "price": 5000000,
+      "quota": 20,
+      "status": "ACTIVE",
+
+      "status_effective": "OPEN",
+      "enrolled_count": 12,
+      "remaining_quota": 8,
+      "is_full": false
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 25,
+    "totalPages": 3,
+    "orderBy": "created_at",
+    "orderDir": "desc"
   }
-  ```
+}
+```
+
+---
+
+##### Notes
+
+* `status_effective` is **computed**, not stored in database.
+* `remaining_quota = quota - enrolled_count`.
+* Batch can remain `OPEN` even if quota is full.
+* Enrollment is blocked when `is_full = true`.
+* Pagination uses offset-based pagination.
+* Sorting by computed fields is done **after data enrichment**.
+
+---
+
+##### Example Requests
+
+```http
+GET /batch?page=1&limit=10
+```
+
+```http
+GET /batch?q=react&status=OPEN
+```
+
+```http
+GET /batch?is_full=false
+```
+
+```http
+GET /batch?orderBy=price&orderDir=asc
+```
+
+```http
+GET /batch?orderBy=remaining_quota&orderDir=asc
+```
 
 #### Create Batch
 Create a new batch.
