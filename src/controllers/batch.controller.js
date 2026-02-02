@@ -2,7 +2,7 @@ import * as batchService from '../services/batch.service.js';
 
 export const getBatches = async (req, res, next) => {
     try {
-        const batches = await batchService.getAllBatches();
+        const batches = await batchService.getAllBatches(req.query);
         res.json(batches);
     } catch (error) {
         next(error);
