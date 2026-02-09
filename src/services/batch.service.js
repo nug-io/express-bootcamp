@@ -1,5 +1,8 @@
 import prisma from '../config/db.js';
+import { Prisma } from '@prisma/client';
+
 import { resolveBatchStatus } from '../utils/batchStatus.js';
+import { throwError } from '../utils/throwError.js';
 
 export const getAllBatches = async (query = {}) => {
   const page = parseInt(query.page) || 1;
@@ -33,7 +36,7 @@ export const getAllBatches = async (query = {}) => {
     ? [{ [orderField]: orderDir }]
     : [{ created_at: 'desc' }];
 
-  // 3. Query DB
+  // 3. Query DB (TABLE DATA)
   const [batches, total] = await Promise.all([
     prisma.batch.findMany({
       where,
@@ -41,15 +44,13 @@ export const getAllBatches = async (query = {}) => {
       take: limit,
       orderBy: dbOrderBy,
       include: {
-        _count: {
-          select: { enrollments: true },
-        },
+        _count: { select: { enrollments: true } },
       },
     }),
     prisma.batch.count({ where }),
   ]);
 
-  // 4. Enrich (computed fields)
+  // 4. Enrich TABLE data (untuk UI)
   let result = batches.map((batch) => {
     const enrolledCount = batch._count.enrollments;
     const remainingQuota = batch.quota - enrolledCount;
@@ -63,7 +64,7 @@ export const getAllBatches = async (query = {}) => {
     };
   });
 
-  // 5. App-level filter (computed)
+  // 5. App-level filter (TABLE only)
   if (query.status) {
     result = result.filter((b) => b.status_effective === query.status);
   }
@@ -82,6 +83,45 @@ export const getAllBatches = async (query = {}) => {
     );
   }
 
+  // 7. SUMMARY — CEPAT (DB yang hitung)
+  const [summaryRow] = await prisma.$queryRaw`
+  SELECT
+    COUNT(*) FILTER (
+      WHERE status = 'ACTIVE'
+      AND start_date > NOW()
+    ) AS open,
+
+    COUNT(*) FILTER (
+      WHERE status = 'ACTIVE'
+      AND start_date <= NOW()
+      AND end_date >= NOW()
+    ) AS ongoing,
+
+    COUNT(*) FILTER (
+      WHERE status = 'ACTIVE'
+      AND (
+        SELECT COUNT(*)
+        FROM "Enrollment"
+        WHERE "Enrollment".batch_id = "Batch".id
+      ) >= quota
+    ) AS full
+  FROM "Batch"
+  WHERE
+    ${
+      keyword
+        ? Prisma.sql`title ILIKE ${'%' + keyword + '%'}`
+        : Prisma.sql`TRUE`
+    };
+`;
+
+  const summary = {
+    open: Number(summaryRow.open),
+    ongoing: Number(summaryRow.ongoing),
+    full: Number(summaryRow.full),
+  };
+
+  summary.active = summary.open + summary.ongoing + summary.full;
+
   return {
     data: result,
     meta: {
@@ -92,6 +132,7 @@ export const getAllBatches = async (query = {}) => {
       orderBy: query.orderBy || 'created_at',
       orderDir,
     },
+    summary,
   };
 };
 
@@ -130,6 +171,16 @@ export const createBatch = async (data) => {
     throwError('End date must be after start date', 400);
   }
 
+  // 1. Cek title unik
+  const existingBatch = await prisma.batch.findUnique({
+    where: { title: data.title },
+    select: { id: true },
+  });
+
+  if (existingBatch) {
+    throwError('Batch title already exists', 409);
+  }
+
   return prisma.batch.create({
     data: {
       title: data.title,
@@ -144,6 +195,18 @@ export const createBatch = async (data) => {
 
 export const updateBatch = async (id, data) => {
   const batch = await getBatchById(id);
+
+  // 1. Cek title unik (jika title diubah)
+  if (data.title && data.title !== batch.title) {
+    const existingBatch = await prisma.batch.findUnique({
+      where: { title: data.title },
+      select: { id: true },
+    });
+
+    if (existingBatch) {
+      throwError('Batch title already exists', 409);
+    }
+  }
 
   if (batch.status_effective !== 'OPEN' && (data.start_date || data.end_date)) {
     throwError('Cannot change dates after batch has started', 400);
