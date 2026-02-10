@@ -47,6 +47,11 @@ model Enrollment {
   user_id     Int
   batch_id    Int
   enrolled_at DateTime @default(now())
+
+  payment_status String   @default("PENDING")
+  expires_at     DateTime?
+  payment_ref    String?
+
   user        User     @relation(fields: [user_id], references: [id])
   batch       Batch    @relation(fields: [batch_id], references: [id])
 

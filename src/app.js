@@ -7,7 +7,7 @@ import errorHandler from './middlewares/errorHandler.js';
 import authRoutes from './routes/auth.routes.js';
 import batchRoutes from './routes/batch.routes.js';
 import enrollmentRoutes from './routes/enrollment.routes.js';
-
+import paymentRoutes from './routes/payment.routes.js';
 import userRoutes from './routes/user.routes.js';
 import materialRoutes from './routes/material.routes.js';
 
@@ -30,6 +30,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/batch', batchRoutes);
 app.use('/api/enrollment', enrollmentRoutes);
 app.use('/api/material', materialRoutes);
+app.use('/api/payment', paymentRoutes);
 
 app.use(errorHandler);
 
