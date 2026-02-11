@@ -6,8 +6,6 @@ import { MIDTRANS } from '../utils/midtrans.js';
 export const handleCallback = async (req, res) => {
   const { order_id, transaction_status, signature_key } = req.body;
 
-  console.log('MIDTRANS CALLBACK HIT');
-
   // 1. Verify signature
   const expectedSignature = crypto
     .createHash('sha512')

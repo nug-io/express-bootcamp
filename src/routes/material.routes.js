@@ -14,6 +14,8 @@ router.use(authenticate);
 // List materials (Enrolled User or Admin)
 router.get('/batch/:batchId', materialController.getBatchMaterials);
 
+router.get('/:id', materialController.getMaterialById);
+
 // Admin Only
 router.post(
 	'/',

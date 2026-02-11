@@ -4,24 +4,29 @@ import { throwError } from '../utils/throwError.js';
 export const getMaterialsByBatchId = async (batchId, userId, userRole) => {
   // If not admin, check enrollment
   if (userRole !== 'ADMIN') {
-    const enrollment = await prisma.enrollment.findUnique({
-      where: {
-        user_id_batch_id: {
-          user_id: userId,
-          batch_id: parseInt(batchId),
-        },
-      },
-    });
-
-    if (!enrollment) {
-      throwError('You are not enrolled in this batch', 403);
-    }
+    await ensurePaidEnrollment(userId, parseInt(batchId));
   }
 
   return prisma.material.findMany({
     where: { batch_id: parseInt(batchId) },
     orderBy: { order: 'asc' },
   });
+};
+
+export const getMaterialById = async (id, userId, userRole) => {
+  const material = await prisma.material.findUnique({
+    where: { id: parseInt(id) },
+  });
+
+  if (!material) {
+    throwError('Material not found', 404);
+  }
+
+  if (userRole !== 'ADMIN') {
+    await ensurePaidEnrollment(userId, material.batch_id);
+  }
+
+  return material;
 };
 
 export const createMaterial = async (data) => {
@@ -81,4 +86,18 @@ export const deleteMaterial = async (id) => {
   return prisma.material.delete({
     where: { id: parseInt(id) },
   });
+};
+
+const ensurePaidEnrollment = async (userId, batchId) => {
+  const enrollment = await prisma.enrollment.findFirst({
+    where: {
+      user_id: userId,
+      batch_id: batchId,
+      payment_status: 'PAID',
+    },
+  });
+
+  if (!enrollment) {
+    throwError('Access denied', 403);
+  }
 };

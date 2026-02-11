@@ -71,7 +71,16 @@ export const enrollUser = async (userId, batchId) => {
       payment_status: batch.price > 0 ? 'PENDING' : 'PAID',
       expires_at: batch.price > 0 ? new Date(Date.now() + ONE_HOUR) : null,
     },
-    include: { user: true },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone_number: true,
+        },
+      },
+    },
   });
 
   if (batch.price > 0) {
