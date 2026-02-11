@@ -34,8 +34,16 @@ export const createMaterial = async (data) => {
     throwError('Batch not found', 404);
   }
 
+  const materialData = {
+    title: data.title,
+    content: data.content,
+    order: data.order,
+    batch_id: data.batch_id,
+    video_url: data.video_url || null,
+  };
+
   return prisma.material.create({
-    data,
+    data: materialData,
   });
 };
 
@@ -48,9 +56,16 @@ export const updateMaterial = async (id, data) => {
     throwError('Material not found', 404);
   }
 
+  const materialData = {
+    title: data.title,
+    content: data.content,
+    order: data.order,
+    video_url: data.video_url ?? material.video_url,
+  };
+
   return prisma.material.update({
     where: { id: parseInt(id) },
-    data,
+    data: materialData,
   });
 };
 
