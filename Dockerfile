@@ -2,14 +2,15 @@ FROM node:24-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
 
-RUN npm ci --only=production
-RUN npx prisma generate
+RUN pnpm install --prod
 
 COPY . .
 
 EXPOSE 4001
 
-CMD ["npm", "start"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm prisma generate && pnpm start"]
