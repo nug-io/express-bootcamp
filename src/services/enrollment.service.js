@@ -62,14 +62,14 @@ export const enrollUser = async (userId, batchId) => {
   }
 
   // 6. Enroll
-  const ONE_HOUR = 60 * 60 * 1000;
+  const ONE_DAY = 60 * 60 * 1000 * 24;
 
   const enrollment = await prisma.enrollment.create({
     data: {
       user_id: userId,
       batch_id: batchId,
       payment_status: batch.price > 0 ? 'PENDING' : 'PAID',
-      expires_at: batch.price > 0 ? new Date(Date.now() + ONE_HOUR) : null,
+      expires_at: batch.price > 0 ? new Date(Date.now() + ONE_DAY) : null,
     },
     include: {
       user: {

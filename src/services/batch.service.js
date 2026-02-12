@@ -99,12 +99,14 @@ export const getAllBatches = async (query = {}) => {
 
     COUNT(*) FILTER (
       WHERE status = 'ACTIVE'
+      AND end_date >= NOW()
       AND (
         SELECT COUNT(*)
         FROM "Enrollment"
         WHERE "Enrollment".batch_id = "Batch".id
       ) >= quota
     ) AS full
+
   FROM "Batch"
   WHERE
     ${
@@ -120,7 +122,7 @@ export const getAllBatches = async (query = {}) => {
     full: Number(summaryRow.full),
   };
 
-  summary.active = summary.open + summary.ongoing + summary.full;
+  summary.active = summary.open + summary.ongoing;
 
   return {
     data: result,
@@ -161,9 +163,15 @@ export const getBatchById = async (id) => {
 
 export const createBatch = async (data) => {
   const startDate = new Date(data.start_date);
-  const endDate = new Date(data.end_date);
+  startDate.setHours(0, 0, 0, 0);
 
-  if (startDate < new Date().setHours(0, 0, 0, 0)) {
+  const endDate = new Date(data.end_date);
+  endDate.setHours(23, 59, 59, 999);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (startDate < today) {
     throwError('Batch cannot start in the past', 400);
   }
 
@@ -171,7 +179,6 @@ export const createBatch = async (data) => {
     throwError('End date must be after start date', 400);
   }
 
-  // 1. Cek title unik
   const existingBatch = await prisma.batch.findUnique({
     where: { title: data.title },
     select: { id: true },
@@ -196,7 +203,6 @@ export const createBatch = async (data) => {
 export const updateBatch = async (id, data) => {
   const batch = await getBatchById(id);
 
-  // 1. Cek title unik (jika title diubah)
   if (data.title && data.title !== batch.title) {
     const existingBatch = await prisma.batch.findUnique({
       where: { title: data.title },
@@ -214,9 +220,14 @@ export const updateBatch = async (id, data) => {
 
   const startDate = data.start_date
     ? new Date(data.start_date)
-    : batch.start_date;
+    : new Date(batch.start_date);
 
-  const endDate = data.end_date ? new Date(data.end_date) : batch.end_date;
+  const endDate = data.end_date
+    ? new Date(data.end_date)
+    : new Date(batch.end_date);
+
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(23, 59, 59, 999);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -225,7 +236,7 @@ export const updateBatch = async (id, data) => {
     throwError('Batch cannot start in the past', 400);
   }
 
-  if (endDate <= startDate) {
+  if (endDate < startDate) {
     throwError('End date must be after start date', 400);
   }
 
