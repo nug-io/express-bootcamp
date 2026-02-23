@@ -106,7 +106,7 @@ export const enrollUser = async (userId, batchId) => {
 
 export const getUserEnrollments = async (userId) => {
   return prisma.enrollment.findMany({
-    where: { user_id: userId },
+    where: { user_id: userId, payment_status: 'PAID' },
     include: {
       batch: true,
     },
