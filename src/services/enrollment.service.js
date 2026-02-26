@@ -1,4 +1,5 @@
 import prisma from '../config/db.js';
+import { Prisma } from '@prisma/client';
 import { throwError } from '../utils/throwError.js';
 import { createPayment } from './midtrans.service.js';
 
@@ -124,19 +125,17 @@ export const getBatchParticipants = async (query = {}) => {
   const keyword = query.q?.trim();
   const batchId = query.batchId ? parseInt(query.batchId) : null;
 
-  // 1. Jika batchId ada
+  // 1. Validasi batch
   if (batchId) {
     const batch = await prisma.batch.findUnique({
       where: { id: batchId },
       select: { id: true },
     });
 
-    if (!batch) {
-      throwError('Batch not found', 404);
-    }
+    if (!batch) throwError('Batch not found', 404);
   }
 
-  // 2. Filter user (search)
+  // 2. Search user
   const userWhere = keyword
     ? {
         OR: [
@@ -146,16 +145,56 @@ export const getBatchParticipants = async (query = {}) => {
       }
     : {};
 
-  // 3. Filter enrollment (batch optional)
+  const now = new Date();
+
+  // 3. Base filter
   const enrollmentWhere = {
     ...(batchId && { batch_id: batchId }),
-    ...(userWhere && { user: userWhere }),
-    ...(query.payment_status && {
-      payment_status: query.payment_status,
-    }),
+    ...(keyword && { user: userWhere }),
   };
 
-  // 4. Sorting
+  // 4. Filter: payment_status langsung
+  if (query.payment_status) {
+    enrollmentWhere.payment_status = query.payment_status;
+  }
+
+  // 5. Filter: status (UI-friendly)
+  if (query.status) {
+    switch (query.status.toUpperCase()) {
+      case 'PAID':
+        enrollmentWhere.payment_status = 'PAID';
+        break;
+
+      case 'PENDING':
+        enrollmentWhere.payment_status = 'PENDING';
+        break;
+
+      case 'EXPIRED':
+        enrollmentWhere.payment_status = 'PENDING';
+        enrollmentWhere.expires_at = { lt: now };
+        break;
+
+      case 'ACTIVE':
+        enrollmentWhere.payment_status = 'PENDING';
+        enrollmentWhere.expires_at = { gt: now };
+        break;
+    }
+  }
+
+  // 6. Filter: expired toggle
+  if (query.is_expired !== undefined) {
+    const isExpired = query.is_expired === 'true';
+
+    enrollmentWhere.payment_status = 'PENDING';
+    enrollmentWhere.expires_at = isExpired ? { lt: now } : { gt: now };
+  }
+
+  // 7. Filter: paid only shortcut
+  if (query.paid_only === 'true') {
+    enrollmentWhere.payment_status = 'PAID';
+  }
+
+  // 8. Sorting (tidak diubah)
   const allowedOrderBy = {
     enrolled_at: true,
     'user.name': true,
@@ -179,7 +218,7 @@ export const getBatchParticipants = async (query = {}) => {
     orderBy = { enrolled_at: 'desc' };
   }
 
-  // 5. Query DB
+  // 9. Query DB
   const [participants, total] = await Promise.all([
     prisma.enrollment.findMany({
       where: enrollmentWhere,
@@ -203,10 +242,41 @@ export const getBatchParticipants = async (query = {}) => {
         },
       },
     }),
-    prisma.enrollment.count({
-      where: enrollmentWhere,
-    }),
+    prisma.enrollment.count({ where: enrollmentWhere }),
   ]);
+
+  // 10. SUMMARY — CEPAT (DB yang hitung)
+  const [summaryRow] = await prisma.$queryRaw`
+SELECT
+  COUNT(*) AS total,
+
+  COUNT(*) FILTER (
+    WHERE payment_status = 'PAID'
+  ) AS paid,
+
+  COUNT(*) FILTER (
+    WHERE payment_status = 'PENDING'
+    AND expires_at > NOW()
+  ) AS pending_active,
+
+  COUNT(*) FILTER (
+    WHERE payment_status = 'PENDING'
+    AND expires_at <= NOW()
+  ) AS pending_expired
+
+FROM "Enrollment"
+WHERE
+  ${batchId ? Prisma.sql`batch_id = ${batchId}` : Prisma.sql`TRUE`};
+`;
+
+  const summary = {
+    total: Number(summaryRow.total),
+    paid: Number(summaryRow.paid),
+    pending_active: Number(summaryRow.pending_active),
+    pending_expired: Number(summaryRow.pending_expired),
+  };
+
+  summary.pending = summary.pending_active + summary.pending_expired;
 
   return {
     data: participants.map((p) => ({
@@ -228,5 +298,6 @@ export const getBatchParticipants = async (query = {}) => {
       orderBy: query.orderBy || 'enrolled_at',
       orderDir,
     },
+    summary,
   };
 };
