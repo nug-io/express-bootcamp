@@ -18,4 +18,7 @@ router.get(
 router.post('/', validate(createEnrollmentSchema), enrollmentController.enroll);
 router.get('/my-enrollments', enrollmentController.getMyEnrollments);
 
+router.get('/my-payments', enrollmentController.getMyPayments);
+router.get('/:id/invoice', enrollmentController.downloadInvoice);
+
 export default router;

@@ -301,3 +301,122 @@ WHERE
     summary,
   };
 };
+
+export const getUserPayments = async (userId, query = {}) => {
+  const page = parseInt(query.page) || 1;
+  const limit = parseInt(query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const keyword = query.q?.trim();
+  const now = new Date();
+
+  // 🔎 Search (judul batch)
+  const where = {
+    user_id: userId,
+    ...(keyword && {
+      batch: {
+        title: {
+          contains: keyword,
+          mode: 'insensitive',
+        },
+      },
+    }),
+  };
+
+  // ⭐ Filter status (UI-friendly)
+  if (query.status) {
+    switch (query.status.toUpperCase()) {
+      case 'PAID':
+        where.payment_status = 'PAID';
+        break;
+
+      case 'PENDING':
+        where.payment_status = 'PENDING';
+        where.expires_at = { gt: now };
+        break;
+
+      case 'EXPIRED':
+        where.payment_status = 'PENDING';
+        where.expires_at = { lte: now };
+        break;
+    }
+  }
+
+  // 🧩 Sorting
+  const allowedOrderBy = {
+    enrolled_at: true,
+    'batch.title': true,
+    payment_status: true,
+    expires_at: true,
+  };
+
+  const orderField = query.orderBy || 'enrolled_at';
+  const orderDir = query.orderDir === 'asc' ? 'asc' : 'desc';
+
+  let orderBy;
+
+  if (allowedOrderBy[orderField]) {
+    if (orderField.includes('.')) {
+      const [relation, field] = orderField.split('.');
+      orderBy = { [relation]: { [field]: orderDir } };
+    } else {
+      orderBy = { [orderField]: orderDir };
+    }
+  } else {
+    orderBy = { enrolled_at: 'desc' };
+  }
+
+  // 📦 Query DB
+  const [items, total] = await Promise.all([
+    prisma.enrollment.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      include: {
+        batch: {
+          select: {
+            id: true,
+            title: true,
+            price: true,
+          },
+        },
+      },
+    }),
+    prisma.enrollment.count({ where }),
+  ]);
+
+  // 🎯 Mapping (biar frontend enak)
+  const data = items.map((p) => {
+    let status = p.payment_status;
+
+    if (
+      p.payment_status === 'PENDING' &&
+      p.expires_at &&
+      p.expires_at <= now
+    ) {
+      status = 'EXPIRED';
+    }
+
+    return {
+      enrollment_id: p.id,
+      status,
+      payment_status: p.payment_status,
+      expires_at: p.expires_at,
+      enrolled_at: p.enrolled_at,
+      batch: p.batch,
+    };
+  });
+
+  return {
+    data,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      orderBy: orderField,
+      orderDir,
+    },
+  };
+};

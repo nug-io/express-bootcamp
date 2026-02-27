@@ -35,3 +35,26 @@ export const getBatchParticipants = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getMyPayments = async (req, res, next) => {
+  try {
+    const data = await enrollmentService.getUserPayments(req.user.id);
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const downloadInvoice = async (req, res, next) => {
+  try {
+    const file = await enrollmentService.generateInvoice(
+      req.user.id,
+      Number(req.params.id)
+    );
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.send(file);
+  } catch (err) {
+    next(err);
+  }
+};
