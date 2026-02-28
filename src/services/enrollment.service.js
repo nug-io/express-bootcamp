@@ -390,11 +390,7 @@ export const getUserPayments = async (userId, query = {}) => {
   const data = items.map((p) => {
     let status = p.payment_status;
 
-    if (
-      p.payment_status === 'PENDING' &&
-      p.expires_at &&
-      p.expires_at <= now
-    ) {
+    if (p.payment_status === 'PENDING' && p.expires_at && p.expires_at <= now) {
       status = 'EXPIRED';
     }
 
@@ -418,5 +414,47 @@ export const getUserPayments = async (userId, query = {}) => {
       orderBy: orderField,
       orderDir,
     },
+  };
+};
+
+export const getInvoiceData = async (userId, enrollmentId) => {
+  const enrollment = await prisma.enrollment.findFirst({
+    where: {
+      id: enrollmentId,
+      user_id: userId,
+      payment_status: 'PAID',
+    },
+    select: {
+      id: true,
+      enrolled_at: true,
+      payment_status: true,
+      user: {
+        select: {
+          name: true,
+          email: true,
+          phone_number: true,
+        },
+      },
+      batch: {
+        select: {
+          id: true,
+          title: true,
+          price: true,
+        },
+      },
+    },
+  });
+
+  if (!enrollment) {
+    throwError('Invoice not found', 404);
+  }
+
+  return {
+    invoice_number: `INV-${enrollment.id}`,
+    issued_at: enrollment.enrolled_at,
+    status: enrollment.payment_status,
+    customer: enrollment.user,
+    batch: enrollment.batch,
+    total: enrollment.batch.price,
   };
 };

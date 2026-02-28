@@ -38,8 +38,12 @@ export const getBatchParticipants = async (req, res, next) => {
 
 export const getMyPayments = async (req, res, next) => {
   try {
-    const data = await enrollmentService.getUserPayments(req.user.id);
-    res.json({ data });
+    const result = await enrollmentService.getUserPayments(
+      req.user.id,
+      req.query
+    );
+
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -47,13 +51,12 @@ export const getMyPayments = async (req, res, next) => {
 
 export const downloadInvoice = async (req, res, next) => {
   try {
-    const file = await enrollmentService.generateInvoice(
+    const result = await enrollmentService.getInvoiceData(
       req.user.id,
       Number(req.params.id)
     );
 
-    res.setHeader('Content-Type', 'application/pdf');
-    res.send(file);
+    res.json(result);
   } catch (err) {
     next(err);
   }
