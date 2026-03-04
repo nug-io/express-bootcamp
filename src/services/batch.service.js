@@ -62,7 +62,7 @@ export const getAllBatches = async (query = {}) => {
 
     return {
       ...batch,
-      tags: batch.tags?.map(t => t.tag.name) || [],
+      tags: batch.tags?.map((t) => t.tag.name) || [],
       status_effective: resolveBatchStatus(batch),
       enrolled_count: enrolledCount,
       remaining_quota: remainingQuota,
@@ -164,7 +164,7 @@ export const getBatchById = async (id) => {
 
   return {
     ...batch,
-    tags: batch.tags?.map(t => t.tag.name) || [],
+    tags: batch.tags?.map((t) => t.tag.name) || [],
     status_effective: resolveBatchStatus(batch),
     enrolled_count: batch._count.enrollments,
     is_full: batch._count.enrollments >= batch.quota,
@@ -238,6 +238,8 @@ export const createBatch = async (data) => {
 export const updateBatch = async (id, data) => {
   const batch = await getBatchById(id);
 
+  const { tags, ...batchData } = data;
+
   if (data.title && data.title !== batch.title) {
     const existingBatch = await prisma.batch.findUnique({
       where: { title: data.title },
@@ -275,13 +277,13 @@ export const updateBatch = async (id, data) => {
     throwError('End date must be after start date', 400);
   }
 
-  if (data.tags) {
+  if (tags) {
     await prisma.batchTag.deleteMany({
       where: { batch_id: parseInt(id) },
     });
 
     await Promise.all(
-      data.tags.map(async (tagName) => {
+      tags.map(async (tagName) => {
         const tag = await prisma.tag.upsert({
           where: { name: tagName },
           update: {},
@@ -297,12 +299,17 @@ export const updateBatch = async (id, data) => {
     );
   }
 
-  return prisma.batch.update({
+  const updated = await prisma.batch.update({
     where: { id: parseInt(id) },
     data: {
-      ...data,
+      ...batchData,
       start_date: startDate,
       end_date: endDate,
     },
   });
+
+  return {
+    ...updated,
+    tags: tags || batch.tags,
+  };
 };
