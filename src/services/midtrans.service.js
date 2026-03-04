@@ -1,7 +1,6 @@
 import midtransClient from 'midtrans-client';
 import { MIDTRANS } from '../utils/midtrans.js';
 
-
 const snap = new midtransClient.Snap({
   isProduction: MIDTRANS.isProduction,
   serverKey: MIDTRANS.serverKey,

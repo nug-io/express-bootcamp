@@ -9,7 +9,7 @@ services:
       - .env.production
 
     ports:
-      - "127.0.0.1:4001:4001"
+      - '127.0.0.1:4001:4001'
 
     deploy:
       resources:
@@ -17,10 +17,10 @@ services:
           memory: 256M
 
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - 'host.docker.internal:host-gateway'

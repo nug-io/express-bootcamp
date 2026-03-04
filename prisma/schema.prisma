@@ -28,6 +28,24 @@ model User {
   enrollments   Enrollment[]
 }
 
+model Tag {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  created_at DateTime  @default(now())
+
+  batches   BatchTag[]
+}
+
+model BatchTag {
+  batch_id Int
+  tag_id   Int
+
+  batch Batch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([batch_id, tag_id])
+}
+
 model Batch {
   id          Int          @id @default(autoincrement())
   title       String       @unique
@@ -40,6 +58,7 @@ model Batch {
   updated_at  DateTime     @updatedAt
   enrollments Enrollment[]
   materials   Material[]
+    tags BatchTag[]
 }
 
 model Enrollment {

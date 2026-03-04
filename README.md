@@ -1,11 +1,13 @@
 # Bootcamp Platform API
 
 ## Overview
+
 This is the backend API for the Bootcamp Platform (MVP). It provides endpoints for authentication, user management, bootcamp batches, enrollment, and course materials.
 
 **Base URL**: `http://localhost:3000`
 
 ## Authentication
+
 - **Mechanism**: JWT (JSON Web Token)
 - **Header**: `Authorization: Bearer <token>`
 - **Roles**: `USER`, `ADMIN`
@@ -17,6 +19,7 @@ This is the backend API for the Bootcamp Platform (MVP). It provides endpoints f
 ### 1. Auth
 
 #### Register User
+
 Create a new user account.
 
 - **Method**: `POST`
@@ -51,6 +54,7 @@ Create a new user account.
   - `409 Conflict`: Email already exists
 
 #### Login
+
 Authenticate and receive a token.
 
 - **Method**: `POST`
@@ -81,6 +85,7 @@ Authenticate and receive a token.
 ### 2. User
 
 #### Get Current Profile
+
 Get details of the currently logged-in user.
 
 - **Method**: `GET`
@@ -107,9 +112,9 @@ Get details of the currently logged-in user.
 
 Get a list of bootcamp batches with pagination, filters, and custom sorting.
 
-* **Method**: `GET`
-* **Path**: `/batch`
-* **Auth**: Public
+- **Method**: `GET`
+- **Path**: `/batch`
+- **Auth**: Public
 
 ---
 
@@ -140,15 +145,14 @@ Get a list of bootcamp batches with pagination, filters, and custom sorting.
 
 ##### Sorting Rules
 
-* DB-level sorting:
+- DB-level sorting:
+  - `title`
+  - `start_date`
+  - `created_at`
+  - `price`
 
-  * `title`
-  * `start_date`
-  * `created_at`
-  * `price`
-* App-level sorting (computed):
-
-  * `remaining_quota` (`quota - enrolled_count`)
+- App-level sorting (computed):
+  - `remaining_quota` (`quota - enrolled_count`)
 
 > `remaining_quota` is **computed**, therefore sorted in application layer after pagination.
 
@@ -189,12 +193,12 @@ Get a list of bootcamp batches with pagination, filters, and custom sorting.
 
 ##### Notes
 
-* `status_effective` is **computed**, not stored in database.
-* `remaining_quota = quota - enrolled_count`.
-* Batch can remain `OPEN` even if quota is full.
-* Enrollment is blocked when `is_full = true`.
-* Pagination uses offset-based pagination.
-* Sorting by computed fields is done **after data enrichment**.
+- `status_effective` is **computed**, not stored in database.
+- `remaining_quota = quota - enrolled_count`.
+- Batch can remain `OPEN` even if quota is full.
+- Enrollment is blocked when `is_full = true`.
+- Pagination uses offset-based pagination.
+- Sorting by computed fields is done **after data enrichment**.
 
 ---
 
@@ -221,6 +225,7 @@ GET /batch?orderBy=remaining_quota&orderDir=asc
 ```
 
 #### Create Batch
+
 Create a new batch.
 
 - **Method**: `POST`
@@ -247,6 +252,7 @@ Create a new batch.
   - `403 Forbidden`: Insufficient permissions
 
 #### Update Batch
+
 Update details of an existing batch.
 
 - **Method**: `PUT`
@@ -272,6 +278,7 @@ Update details of an existing batch.
 ### 4. Enrollment
 
 #### Enroll in Batch
+
 Enroll the current user into a specific batch.
 
 - **Method**: `POST`
@@ -300,6 +307,7 @@ Enroll the current user into a specific batch.
   - `409 Conflict`: Already enrolled
 
 #### Get My Enrollments
+
 List batches the current user is enrolled in.
 
 - **Method**: `GET`
@@ -322,6 +330,7 @@ List batches the current user is enrolled in.
 ### 5. Material
 
 #### List Materials
+
 Get materials for a specific batch (must be enrolled).
 
 - **Method**: `GET`
@@ -344,6 +353,7 @@ Get materials for a specific batch (must be enrolled).
   - `403 Forbidden`: Not enrolled
 
 #### Create Material
+
 Add a new learning material to a batch.
 
 - **Method**: `POST`
@@ -361,6 +371,7 @@ Add a new learning material to a batch.
 - **Success Response** (201 Created)
 
 #### Update Material
+
 Edit an existing material.
 
 - **Method**: `PUT`

@@ -22,7 +22,7 @@ app.use(cookieParser());
 app.use(requestLogger);
 
 app.get(['/api', '/api/'], (req, res) => {
-    res.json({ message: 'Bootcamp API is running' });
+  res.json({ message: 'Bootcamp API is running' });
 });
 
 app.use('/api/auth', authRoutes);

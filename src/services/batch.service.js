@@ -44,6 +44,11 @@ export const getAllBatches = async (query = {}) => {
       take: limit,
       orderBy: dbOrderBy,
       include: {
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
         _count: { select: { enrollments: true } },
       },
     }),
@@ -57,6 +62,7 @@ export const getAllBatches = async (query = {}) => {
 
     return {
       ...batch,
+      tags: batch.tags?.map(t => t.tag.name) || [],
       status_effective: resolveBatchStatus(batch),
       enrolled_count: enrolledCount,
       remaining_quota: remainingQuota,
@@ -143,9 +149,12 @@ export const getBatchById = async (id) => {
     where: { id: parseInt(id) },
     include: {
       materials: true,
-      _count: {
-        select: { enrollments: true },
+      tags: {
+        include: {
+          tag: true,
+        },
       },
+      _count: { select: { enrollments: true } },
     },
   });
 
@@ -155,6 +164,7 @@ export const getBatchById = async (id) => {
 
   return {
     ...batch,
+    tags: batch.tags?.map(t => t.tag.name) || [],
     status_effective: resolveBatchStatus(batch),
     enrolled_count: batch._count.enrollments,
     is_full: batch._count.enrollments >= batch.quota,
@@ -188,7 +198,9 @@ export const createBatch = async (data) => {
     throwError('Batch title already exists', 409);
   }
 
-  return prisma.batch.create({
+  const tags = data.tags || [];
+
+  const batch = await prisma.batch.create({
     data: {
       title: data.title,
       start_date: startDate,
@@ -198,6 +210,29 @@ export const createBatch = async (data) => {
       status: 'ACTIVE',
     },
   });
+
+  if (tags.length) {
+    await Promise.all(
+      tags.map(async (tagName) => {
+        const tag = await prisma.tag.upsert({
+          where: { name: tagName },
+          update: {},
+          create: { name: tagName },
+        });
+        await prisma.batchTag.create({
+          data: {
+            batch_id: batch.id,
+            tag_id: tag.id,
+          },
+        });
+      })
+    );
+  }
+
+  return {
+    ...batch,
+    tags,
+  };
 };
 
 export const updateBatch = async (id, data) => {
@@ -238,6 +273,28 @@ export const updateBatch = async (id, data) => {
 
   if (endDate < startDate) {
     throwError('End date must be after start date', 400);
+  }
+
+  if (data.tags) {
+    await prisma.batchTag.deleteMany({
+      where: { batch_id: parseInt(id) },
+    });
+
+    await Promise.all(
+      data.tags.map(async (tagName) => {
+        const tag = await prisma.tag.upsert({
+          where: { name: tagName },
+          update: {},
+          create: { name: tagName },
+        });
+        await prisma.batchTag.create({
+          data: {
+            batch_id: parseInt(id),
+            tag_id: tag.id,
+          },
+        });
+      })
+    );
   }
 
   return prisma.batch.update({

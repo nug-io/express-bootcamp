@@ -10,9 +10,9 @@ router.use(authenticate);
 
 // List enrollment (Admin Only)
 router.get(
-	'/',
-	authorize(['ADMIN']),
-	enrollmentController.getBatchParticipants
+  '/',
+  authorize(['ADMIN']),
+  enrollmentController.getBatchParticipants
 );
 
 router.post('/', validate(createEnrollmentSchema), enrollmentController.enroll);
