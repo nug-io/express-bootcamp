@@ -17,23 +17,41 @@ enum BatchStatus {
 }
 
 model User {
-  id            Int          @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   name          String
-  email         String       @unique
+  email         String   @unique
   phone_number  String
   password_hash String
-  role          Role         @default(USER)
-  created_at    DateTime     @default(now())
-  updated_at    DateTime     @updatedAt
-  enrollments   Enrollment[]
+  role          Role     @default(USER)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  enrollments Enrollment[]
 }
 
 model Tag {
-  id        Int        @id @default(autoincrement())
-  name      String     @unique
-  created_at DateTime  @default(now())
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  created_at DateTime @default(now())
 
-  batches   BatchTag[]
+  batches BatchTag[]
+}
+
+model Batch {
+  id          Int         @id @default(autoincrement())
+  title       String      @unique
+  description String?
+  start_date  DateTime
+  end_date    DateTime
+  price       Int
+  quota       Int
+  status      BatchStatus @default(ACTIVE)
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @updatedAt
+
+  enrollments Enrollment[]
+  materials   Material[]
+  tags        BatchTag[]
 }
 
 model BatchTag {
@@ -46,33 +64,17 @@ model BatchTag {
   @@id([batch_id, tag_id])
 }
 
-model Batch {
-  id          Int          @id @default(autoincrement())
-  title       String       @unique
-  start_date  DateTime
-  end_date    DateTime
-  price       Int
-  quota       Int
-  status      BatchStatus  @default(ACTIVE)
-  created_at  DateTime     @default(now())
-  updated_at  DateTime     @updatedAt
-  enrollments Enrollment[]
-  materials   Material[]
-    tags BatchTag[]
-}
-
 model Enrollment {
-  id          Int      @id @default(autoincrement())
-  user_id     Int
-  batch_id    Int
-  enrolled_at DateTime @default(now())
-
-  payment_status String   @default("PENDING")
+  id             Int       @id @default(autoincrement())
+  user_id        Int
+  batch_id       Int
+  enrolled_at    DateTime  @default(now())
+  payment_status String    @default("PENDING")
   expires_at     DateTime?
   payment_ref    String?
 
-  user        User     @relation(fields: [user_id], references: [id])
-  batch       Batch    @relation(fields: [batch_id], references: [id])
+  user  User  @relation(fields: [user_id], references: [id])
+  batch Batch @relation(fields: [batch_id], references: [id])
 
   @@unique([user_id, batch_id])
 }
@@ -85,7 +87,7 @@ model Material {
   order      Int
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
-  video_url String?
-  
-  batch      Batch    @relation(fields: [batch_id], references: [id])
+  video_url  String?
+
+  batch Batch @relation(fields: [batch_id], references: [id])
 }

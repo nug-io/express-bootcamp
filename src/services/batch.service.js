@@ -203,6 +203,7 @@ export const createBatch = async (data) => {
   const batch = await prisma.batch.create({
     data: {
       title: data.title,
+      description: data.description || null,
       start_date: startDate,
       end_date: endDate,
       price: data.price,
