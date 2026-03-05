@@ -16,6 +16,11 @@ enum BatchStatus {
   CLOSED
 }
 
+enum BatchType {
+  LIVE
+  COURSE
+}
+
 model User {
   id            Int      @id @default(autoincrement())
   name          String
@@ -41,10 +46,11 @@ model Batch {
   id          Int         @id @default(autoincrement())
   title       String      @unique
   description String?
-  start_date  DateTime
-  end_date    DateTime
+  type        BatchType   @default(LIVE)
+  start_date  DateTime?
+  end_date    DateTime?
   price       Int
-  quota       Int
+  quota       Int?
   status      BatchStatus @default(ACTIVE)
   created_at  DateTime    @default(now())
   updated_at  DateTime    @updatedAt

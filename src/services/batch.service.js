@@ -58,7 +58,8 @@ export const getAllBatches = async (query = {}) => {
   // 4. Enrich TABLE data (untuk UI)
   let result = batches.map((batch) => {
     const enrolledCount = batch._count.enrollments;
-    const remainingQuota = batch.quota - enrolledCount;
+    const remainingQuota =
+      batch.quota === null ? null : batch.quota - enrolledCount;
 
     return {
       ...batch,
@@ -66,7 +67,7 @@ export const getAllBatches = async (query = {}) => {
       status_effective: resolveBatchStatus(batch),
       enrolled_count: enrolledCount,
       remaining_quota: remainingQuota,
-      is_full: remainingQuota <= 0,
+      is_full: batch.quota === null ? false : remainingQuota <= 0,
     };
   });
 
@@ -167,26 +168,42 @@ export const getBatchById = async (id) => {
     tags: batch.tags?.map((t) => t.tag.name) || [],
     status_effective: resolveBatchStatus(batch),
     enrolled_count: batch._count.enrollments,
-    is_full: batch._count.enrollments >= batch.quota,
+    is_full:
+      batch.quota === null ? false : batch._count.enrollments >= batch.quota,
   };
 };
 
 export const createBatch = async (data) => {
-  const startDate = new Date(data.start_date);
-  startDate.setHours(0, 0, 0, 0);
+  let startDate = null;
+  let endDate = null;
 
-  const endDate = new Date(data.end_date);
-  endDate.setHours(23, 59, 59, 999);
+  if (data.type === 'LIVE') {
+    startDate = new Date(data.start_date);
+    startDate.setHours(0, 0, 0, 0);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+    endDate = new Date(data.end_date);
+    endDate.setHours(23, 59, 59, 999);
 
-  if (startDate < today) {
-    throwError('Batch cannot start in the past', 400);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!data.start_date || !data.end_date || !data.quota) {
+      throwError('LIVE batch requires start_date, end_date and quota', 400);
+    }
+
+    if (startDate < today) {
+      throwError('Batch cannot start in the past', 400);
+    }
+
+    if (endDate < startDate) {
+      throwError('End date must be after start date', 400);
+    }
   }
 
-  if (endDate < startDate) {
-    throwError('End date must be after start date', 400);
+  if (data.type === 'COURSE') {
+    data.start_date = null;
+    data.end_date = null;
+    data.quota = null;
   }
 
   const existingBatch = await prisma.batch.findUnique({
@@ -204,6 +221,7 @@ export const createBatch = async (data) => {
     data: {
       title: data.title,
       description: data.description || null,
+      type: data.type || 'LIVE',
       start_date: startDate,
       end_date: endDate,
       price: data.price,
