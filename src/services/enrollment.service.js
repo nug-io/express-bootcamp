@@ -55,10 +55,12 @@ export const enrollUser = async (userId, batchId) => {
     }
 
     if (existingEnrollment.payment_status === 'PENDING') {
-      return {
-        enrollment: existingEnrollment,
-        resumePayment: true,
-      };
+      if (existingEnrollment.expires_at > new Date()) {
+        return {
+          enrollment: existingEnrollment,
+          resumePayment: true,
+        };
+      }
     }
   }
 
@@ -69,8 +71,13 @@ export const enrollUser = async (userId, batchId) => {
     data: {
       user_id: userId,
       batch_id: batchId,
+
       payment_status: batch.price > 0 ? 'PENDING' : 'PAID',
       expires_at: batch.price > 0 ? new Date(Date.now() + ONE_DAY) : null,
+
+      price: batch.price,
+      discount: 0,
+      total_paid: batch.price,
     },
     include: {
       user: {
@@ -100,6 +107,20 @@ export const enrollUser = async (userId, batchId) => {
       enrollment,
       snapToken: payment.token,
     };
+  }
+
+  // FREE / PROMO
+  if (batch.price === 0) {
+    const invoiceNumber = generateInvoiceNumber();
+
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: {
+        invoice_number: invoiceNumber,
+      },
+    });
+
+    enrollment.invoice_number = invoiceNumber;
   }
 
   return { enrollment };
@@ -342,7 +363,7 @@ export const getUserPayments = async (userId, query = {}) => {
     }
   }
 
-  // 🧩 Sorting
+  // Sorting
   const allowedOrderBy = {
     enrolled_at: true,
     'batch.title': true,
@@ -366,7 +387,7 @@ export const getUserPayments = async (userId, query = {}) => {
     orderBy = { enrolled_at: 'desc' };
   }
 
-  // 📦 Query DB
+  // Query DB
   const [items, total] = await Promise.all([
     prisma.enrollment.findMany({
       where,
@@ -426,6 +447,7 @@ export const getInvoiceData = async (userId, enrollmentId) => {
     },
     select: {
       id: true,
+      invoice_number: true,
       enrolled_at: true,
       payment_status: true,
       user: {
@@ -450,7 +472,7 @@ export const getInvoiceData = async (userId, enrollmentId) => {
   }
 
   return {
-    invoice_number: `INV-${enrollment.id}`,
+    invoice_number: enrollment.invoice_number,
     issued_at: enrollment.enrolled_at,
     status: enrollment.payment_status,
     customer: enrollment.user,
@@ -458,3 +480,18 @@ export const getInvoiceData = async (userId, enrollmentId) => {
     total: enrollment.batch.price,
   };
 };
+
+function generateInvoiceNumber() {
+  const now = new Date();
+
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mi = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+
+  return `INV-${yyyy}${mm}${dd}${hh}${mi}${ss}${ms}`;
+}

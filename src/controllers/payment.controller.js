@@ -24,30 +24,35 @@ export const handleCallback = async (req, res) => {
   // 2. Ambil enrollment id
   const enrollmentId = parseInt(order_id.replace('ENROLL-', ''), 10);
 
-  const enrollment = await prisma.enrollment.findUnique({
-    where: { id: enrollmentId },
-  });
-
-  if (!enrollment) {
-    throwError('Enrollment not found', 404);
-  }
-
-  // 3. Idempotency guard
-  if (enrollment.payment_status === 'PAID') {
-    return res.json({ received: true });
-  }
-
-  if (enrollment.payment_status === 'EXPIRED') {
-    return res.json({ received: true });
-  }
-
-  // 4. Update status
   if (transaction_status === 'settlement') {
-    await prisma.enrollment.update({
-      where: { id: enrollmentId },
-      data: { payment_status: 'PAID' },
+    const invoiceNumber = generateInvoiceNumber();
+
+    await prisma.enrollment.updateMany({
+      where: {
+        id: enrollmentId,
+        payment_status: 'PENDING',
+      },
+      data: {
+        payment_status: 'PAID',
+        invoice_number: invoiceNumber,
+      },
     });
   }
 
   res.json({ received: true });
 };
+
+function generateInvoiceNumber() {
+  const now = new Date();
+
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mi = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+
+  return `INV-${yyyy}${mm}${dd}${hh}${mi}${ss}${ms}`;
+}
