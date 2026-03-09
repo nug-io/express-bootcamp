@@ -10,6 +10,7 @@ import enrollmentRoutes from './routes/enrollment.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import userRoutes from './routes/user.routes.js';
 import materialRoutes from './routes/material.routes.js';
+import mentorRoutes from './routes/mentor.routes.js';
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.get(['/api', '/api/'], (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/mentor', mentorRoutes);
 app.use('/api/batch', batchRoutes);
 app.use('/api/enrollment', enrollmentRoutes);
 app.use('/api/material', materialRoutes);

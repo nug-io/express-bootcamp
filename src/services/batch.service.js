@@ -22,50 +22,14 @@ export const getAllBatches = async (query = {}) => {
   const skip = (page - 1) * limit;
 
   // 1. DB-level filter
-  const filters = [];
+  const where = buildBatchFilters({
+    keyword,
+    type,
+    tags,
+    tagMode,
+  });
 
-  if (keyword) {
-    filters.push({
-      title: {
-        contains: keyword,
-        mode: 'insensitive',
-      },
-    });
-  }
-
-  if (type?.length) {
-    filters.push({
-      type: { in: type },
-    });
-  }
-
-  if (tags?.length) {
-    if (tagMode === 'and') {
-      tags.forEach((tag) => {
-        filters.push({
-          tags: {
-            some: {
-              tag: { name: tag },
-            },
-          },
-        });
-      });
-    } else {
-      filters.push({
-        tags: {
-          some: {
-            tag: {
-              name: { in: tags },
-            },
-          },
-        },
-      });
-    }
-  }
-
-  const where = filters.length ? { AND: filters } : undefined;
-
-  // 3. Query DB (TABLE DATA)
+  // 2. Query DB (TABLE DATA)
   const { data: batches, total } = await listQuery({
     model: prisma.batch,
     where,
@@ -80,10 +44,10 @@ export const getAllBatches = async (query = {}) => {
     take: limit,
   });
 
-  // 4. Enrich TABLE data (untuk UI)
+  // 3. Enrich TABLE data (untuk UI)
   let result = batches.map(mapBatchResult);
 
-  // 5. App-level filter (TABLE only)
+  // 4. App-level filter (TABLE only)
   if (status) {
     result = result.filter((b) => b.status_effective === status);
   }
@@ -92,7 +56,7 @@ export const getAllBatches = async (query = {}) => {
     result = result.filter((b) => b.is_full === isFull);
   }
 
-  // 6. App-level orderBy (computed)
+  // 5. App-level orderBy (computed)
   if (orderBy === 'remaining_quota') {
     result.sort((a, b) =>
       orderDir === 'asc'
@@ -101,7 +65,7 @@ export const getAllBatches = async (query = {}) => {
     );
   }
 
-  // 7. SUMMARY — CEPAT (DB yang hitung)
+  // 6. SUMMARY — CEPAT (DB yang hitung)
   const [summaryRow] = await prisma.$queryRaw`
   SELECT
     COUNT(*) FILTER (
@@ -140,12 +104,6 @@ export const getAllBatches = async (query = {}) => {
 
   const summaryByTag = await getBatchTagSummary();
 
-  const querySchema = {
-    type: ['LIVE', 'COURSE'],
-    tagMode: ['or', 'and'],
-    orderBy: ['created_at', 'title', 'price', 'start_date'],
-  };
-
   if (mode === 'summary') {
     return {
       summary,
@@ -154,19 +112,7 @@ export const getAllBatches = async (query = {}) => {
     };
   }
 
-  const queryInfo = {
-    filters: {
-      type: ['LIVE', 'COURSE'],
-      tagMode: ['or', 'and'],
-      status: ['OPEN', 'ONGOING', 'FULL'],
-    },
-    sorting: ['created_at', 'title', 'price', 'start_date', 'remaining_quota'],
-    pagination: {
-      pageParam: 'page',
-      limitParam: 'limit',
-      maxLimit: 100,
-    },
-  };
+  const queryInfo = buildBatchQueryInfo();
 
   return buildListResponse({
     data: result,
@@ -555,5 +501,66 @@ function buildListResponse({
       filters,
     },
     ...extras,
+  };
+}
+
+function buildBatchFilters({ keyword, type, tags, tagMode }) {
+  const filters = [];
+
+  if (keyword) {
+    filters.push({
+      title: {
+        contains: keyword,
+        mode: 'insensitive',
+      },
+    });
+  }
+
+  if (type?.length) {
+    filters.push({
+      type: { in: type },
+    });
+  }
+
+  if (tags?.length) {
+    if (tagMode === 'and') {
+      tags.forEach((tag) => {
+        filters.push({
+          tags: {
+            some: {
+              tag: { name: tag },
+            },
+          },
+        });
+      });
+    } else {
+      filters.push({
+        tags: {
+          some: {
+            tag: {
+              name: { in: tags },
+            },
+          },
+        },
+      });
+    }
+  }
+
+  return filters.length ? { AND: filters } : undefined;
+}
+
+function buildBatchQueryInfo() {
+  return {
+    filters: {
+      type: ['LIVE', 'COURSE'],
+      tagMode: ['or', 'and'],
+      status: ['OPEN', 'ONGOING', 'FULL'],
+    },
+    sorting: ['created_at', 'title', 'price', 'start_date', 'remaining_quota'],
+    pagination: {
+      pageParam: 'page',
+      limitParam: 'limit',
+      maxLimit: 100,
+    },
   };
 }

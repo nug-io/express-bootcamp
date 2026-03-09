@@ -9,6 +9,7 @@ generator client {
 enum Role {
   USER
   ADMIN
+  MENTOR
 }
 
 enum BatchStatus {
@@ -21,17 +22,60 @@ enum BatchType {
   COURSE
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
 model User {
-  id            Int      @id @default(autoincrement())
+  id            Int        @id @default(autoincrement())
   name          String
-  email         String   @unique
+  email         String     @unique
   phone_number  String
   password_hash String
-  role          Role     @default(USER)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  role          Role       @default(USER)
+  status        UserStatus @default(ACTIVE)
+  deleted_at    DateTime?
+  banned_at     DateTime?
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
 
-  enrollments Enrollment[]
+  enrollments   Enrollment[]
+  auditLogs     AuditLog[]
+  mentorProfile MentorProfile?
+
+  @@index([role])
+  @@index([status])
+  @@index([email])
+}
+
+model MentorProfile {
+  id Int @id @default(autoincrement())
+
+  user_id Int  @unique
+  user    User @relation(fields: [user_id], references: [id])
+
+  name   String
+  bio    String?
+  avatar String?
+
+  linkedin String?
+  github   String?
+  website  String?
+
+  experience_years Int?
+
+  total_reviews Int @default(0)
+
+  is_active Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  batches Batch[]
+
+  @@index([is_active])
 }
 
 model Tag {
@@ -43,7 +87,11 @@ model Tag {
 }
 
 model Batch {
-  id          Int         @id @default(autoincrement())
+  id Int @id @default(autoincrement())
+
+  mentor_id Int?
+  mentor    MentorProfile? @relation(fields: [mentor_id], references: [id])
+
   title       String      @unique
   description String?
   type        BatchType   @default(LIVE)
@@ -100,4 +148,19 @@ model Material {
   video_url  String?
 
   batch Batch @relation(fields: [batch_id], references: [id])
+}
+
+model AuditLog {
+  id Int @id @default(autoincrement())
+
+  admin_id  Int
+  action    String
+  target_id Int?
+  target    String?
+
+  metadata Json?
+
+  created_at DateTime @default(now())
+
+  admin User @relation(fields: [admin_id], references: [id])
 }
