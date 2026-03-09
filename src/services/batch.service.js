@@ -5,84 +5,95 @@ import { resolveBatchStatus } from '../utils/batchStatus.js';
 import { throwError } from '../utils/throwError.js';
 
 export const getAllBatches = async (query = {}) => {
-  const page = parseInt(query.page) || 1;
-  const limit = parseInt(query.limit) || 10;
+  const {
+    page,
+    limit,
+    keyword,
+    type,
+    tags,
+    tagMode,
+    status,
+    isFull,
+    orderBy,
+    orderDir,
+    mode,
+  } = normalizeBatchQuery(query);
+
   const skip = (page - 1) * limit;
 
-  const keyword = query.q?.trim();
-
   // 1. DB-level filter
-  const where = {
-    ...(keyword && {
+  const filters = [];
+
+  if (keyword) {
+    filters.push({
       title: {
         contains: keyword,
         mode: 'insensitive',
       },
-    }),
-  };
-
-  // 2. DB-level orderBy whitelist
-  const allowedOrderBy = {
-    title: true,
-    start_date: true,
-    created_at: true,
-    price: true,
-  };
-
-  const orderField = query.orderBy || 'created_at';
-  const orderDir = query.orderDir === 'asc' ? 'asc' : 'desc';
-
-  const dbOrderBy = allowedOrderBy[orderField]
-    ? [{ [orderField]: orderDir }]
-    : [{ created_at: 'desc' }];
-
-  // 3. Query DB (TABLE DATA)
-  const [batches, total] = await Promise.all([
-    prisma.batch.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: dbOrderBy,
-      include: {
-        tags: {
-          include: {
-            tag: true,
-          },
-        },
-        _count: { select: { enrollments: true } },
-      },
-    }),
-    prisma.batch.count({ where }),
-  ]);
-
-  // 4. Enrich TABLE data (untuk UI)
-  let result = batches.map((batch) => {
-    const enrolledCount = batch._count.enrollments;
-    const remainingQuota =
-      batch.quota === null ? null : batch.quota - enrolledCount;
-
-    return {
-      ...batch,
-      tags: batch.tags?.map((t) => t.tag.name) || [],
-      status_effective: resolveBatchStatus(batch),
-      enrolled_count: enrolledCount,
-      remaining_quota: remainingQuota,
-      is_full: batch.quota === null ? false : remainingQuota <= 0,
-    };
-  });
-
-  // 5. App-level filter (TABLE only)
-  if (query.status) {
-    result = result.filter((b) => b.status_effective === query.status);
+    });
   }
 
-  if (query.is_full !== undefined) {
-    const isFull = query.is_full === 'true';
+  if (type?.length) {
+    filters.push({
+      type: { in: type },
+    });
+  }
+
+  if (tags?.length) {
+    if (tagMode === 'and') {
+      tags.forEach((tag) => {
+        filters.push({
+          tags: {
+            some: {
+              tag: { name: tag },
+            },
+          },
+        });
+      });
+    } else {
+      filters.push({
+        tags: {
+          some: {
+            tag: {
+              name: { in: tags },
+            },
+          },
+        },
+      });
+    }
+  }
+
+  const where = filters.length ? { AND: filters } : undefined;
+
+  // 3. Query DB (TABLE DATA)
+  const { data: batches, total } = await listQuery({
+    model: prisma.batch,
+    where,
+    include: {
+      tags: {
+        include: { tag: true },
+      },
+      _count: { select: { enrollments: true } },
+    },
+    orderBy: orderDir,
+    skip,
+    take: limit,
+  });
+
+  // 4. Enrich TABLE data (untuk UI)
+  let result = batches.map(mapBatchResult);
+
+  // 5. App-level filter (TABLE only)
+  if (status) {
+    result = result.filter((b) => b.status_effective === status);
+  }
+
+  if (isFull !== undefined) {
     result = result.filter((b) => b.is_full === isFull);
   }
 
   // 6. App-level orderBy (computed)
-  if (query.orderBy === 'remaining_quota') {
+  if (orderBy === 'remaining_quota') {
     result.sort((a, b) =>
       orderDir === 'asc'
         ? a.remaining_quota - b.remaining_quota
@@ -123,26 +134,59 @@ export const getAllBatches = async (query = {}) => {
     };
 `;
 
-  const summary = {
-    open: Number(summaryRow.open),
-    ongoing: Number(summaryRow.ongoing),
-    full: Number(summaryRow.full),
+  const summary = buildSummary(summaryRow);
+
+  const summaryByType = await getBatchTypeSummary();
+
+  const summaryByTag = await getBatchTagSummary();
+
+  const querySchema = {
+    type: ['LIVE', 'COURSE'],
+    tagMode: ['or', 'and'],
+    orderBy: ['created_at', 'title', 'price', 'start_date'],
   };
 
-  summary.active = summary.open + summary.ongoing;
+  if (mode === 'summary') {
+    return {
+      summary,
+      summaryByType,
+      summaryByTag,
+    };
+  }
 
-  return {
-    data: result,
-    meta: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-      orderBy: query.orderBy || 'created_at',
-      orderDir,
+  const queryInfo = {
+    filters: {
+      type: ['LIVE', 'COURSE'],
+      tagMode: ['or', 'and'],
+      status: ['OPEN', 'ONGOING', 'FULL'],
     },
-    summary,
+    sorting: ['created_at', 'title', 'price', 'start_date', 'remaining_quota'],
+    pagination: {
+      pageParam: 'page',
+      limitParam: 'limit',
+      maxLimit: 100,
+    },
   };
+
+  return buildListResponse({
+    data: result,
+    page,
+    limit,
+    total,
+    orderBy,
+    orderDir,
+    filters: {
+      type: type || null,
+      tags: tags || null,
+      tagMode,
+    },
+    extras: {
+      summary,
+      summaryByType,
+      summaryByTag,
+      queryInfo,
+    },
+  });
 };
 
 export const getBatchById = async (id) => {
@@ -177,7 +221,9 @@ export const createBatch = async (data) => {
   let startDate = null;
   let endDate = null;
 
-  if (data.type === 'LIVE') {
+  const type = data.type || 'LIVE';
+
+  if (type === 'LIVE') {
     startDate = new Date(data.start_date);
     startDate.setHours(0, 0, 0, 0);
 
@@ -200,7 +246,7 @@ export const createBatch = async (data) => {
     }
   }
 
-  if (data.type === 'COURSE') {
+  if (type === 'COURSE') {
     data.start_date = null;
     data.end_date = null;
     data.quota = null;
@@ -332,3 +378,182 @@ export const updateBatch = async (id, data) => {
     tags: tags || batch.tags,
   };
 };
+
+function normalizeBatchQuery(query) {
+  const mode = query.mode === 'summary' ? 'summary' : 'list';
+
+  const page = Math.max(parseInt(query.page) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(query.limit) || 10, 1), 100);
+
+  const keyword = query.q?.trim() || undefined;
+
+  const type = query.type
+    ? query.type
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => ['LIVE', 'COURSE'].includes(t))
+    : undefined;
+
+  const tagMode = query.tagMode === 'and' ? 'and' : 'or';
+
+  const tags = query.tag
+    ? query.tag
+        .split(',')
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean)
+    : undefined;
+
+  const status = query.status || undefined;
+
+  const isFull =
+    query.is_full === 'true'
+      ? true
+      : query.is_full === 'false'
+        ? false
+        : undefined;
+
+  const allowedOrderBy = [
+    'created_at',
+    'title',
+    'price',
+    'start_date',
+    'remaining_quota',
+  ];
+
+  const orderBy = allowedOrderBy.includes(query.orderBy)
+    ? query.orderBy
+    : 'created_at';
+
+  const orderDir = query.orderDir === 'asc' ? 'asc' : 'desc';
+
+  return {
+    page,
+    limit,
+    keyword,
+    type,
+    tags,
+    tagMode,
+    status,
+    isFull,
+    orderBy,
+    orderDir,
+    mode,
+  };
+}
+
+function mapBatchResult(batch) {
+  const enrolledCount = batch._count.enrollments;
+
+  const remainingQuota =
+    batch.quota === null ? null : batch.quota - enrolledCount;
+
+  return {
+    ...batch,
+    tags: batch.tags?.map((t) => t.tag.name) || [],
+    status_effective: resolveBatchStatus(batch),
+    enrolled_count: enrolledCount,
+    remaining_quota: remainingQuota,
+    is_full: batch.quota === null ? false : remainingQuota <= 0,
+  };
+}
+
+function buildSummary(summaryRow) {
+  const summary = {
+    open: Number(summaryRow.open),
+    ongoing: Number(summaryRow.ongoing),
+    full: Number(summaryRow.full),
+  };
+
+  summary.active = summary.open + summary.ongoing;
+
+  return summary;
+}
+
+async function listQuery({
+  model,
+  where = {},
+  include = {},
+  orderBy,
+  skip,
+  take,
+}) {
+  const [data, total] = await Promise.all([
+    model.findMany({
+      where,
+      include,
+      orderBy,
+      skip,
+      take,
+    }),
+    model.count({ where }),
+  ]);
+
+  return { data, total };
+}
+
+async function getBatchTypeSummary() {
+  const rows = await prisma.batch.groupBy({
+    by: ['type'],
+    _count: { id: true },
+  });
+
+  const summary = {
+    LIVE: 0,
+    COURSE: 0,
+  };
+
+  rows.forEach((row) => {
+    summary[row.type] = row._count.id;
+  });
+
+  return summary;
+}
+
+async function getBatchTagSummary() {
+  const rows = await prisma.batchTag.groupBy({
+    by: ['tag_id'],
+    _count: { batch_id: true },
+  });
+
+  const tags = await prisma.tag.findMany({
+    select: { id: true, name: true },
+  });
+
+  const summary = {};
+
+  tags.forEach((tag) => {
+    summary[tag.name] = 0;
+  });
+
+  rows.forEach((row) => {
+    const tag = tags.find((t) => t.id === row.tag_id);
+    if (tag) summary[tag.name] = row._count.batch_id;
+  });
+
+  return summary;
+}
+
+function buildListResponse({
+  data,
+  page,
+  limit,
+  total,
+  orderBy,
+  orderDir,
+  filters,
+  extras = {},
+}) {
+  return {
+    data,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      orderBy,
+      orderDir,
+      filters,
+    },
+    ...extras,
+  };
+}
