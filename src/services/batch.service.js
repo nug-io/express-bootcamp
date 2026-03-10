@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 
 import { resolveBatchStatus } from '../utils/batchStatus.js';
 import { throwError } from '../utils/throwError.js';
+import { DEFAULT_BATCH_IMAGE } from '../utils/defaultImages.js';
 
 export const getAllBatches = async (query = {}) => {
   const {
@@ -171,6 +172,7 @@ export const getBatchById = async (id) => {
 
   return {
     ...batch,
+    image_url: batch.image_url || DEFAULT_BATCH_IMAGE,
     tags: batch.tags?.map((t) => t.tag.name) || [],
     mentors: batch.mentors?.map((m) => m.mentor) || [],
     status_effective: resolveBatchStatus(batch),
@@ -231,6 +233,7 @@ export const createBatch = async (data) => {
     data: {
       title: data.title,
       description: data.description || null,
+      image_url: data.image_url || null,
       type: data.type || 'LIVE',
       start_date: startDate,
       end_date: endDate,
@@ -273,6 +276,7 @@ export const createBatch = async (data) => {
 
   return {
     ...batch,
+    image_url: batch.image_url || DEFAULT_BATCH_IMAGE,
     tags,
   };
 };
@@ -465,6 +469,7 @@ function mapBatchResult(batch) {
 
   return {
     ...batch,
+    image_url: batch.image_url || DEFAULT_BATCH_IMAGE,
     tags: batch.tags?.map((t) => t.tag.name) || [],
     status_effective: resolveBatchStatus(batch),
     enrolled_count: enrolledCount,

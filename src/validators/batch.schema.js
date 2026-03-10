@@ -10,6 +10,7 @@ const dateSchema = z.preprocess((val) => {
 export const createBatchSchema = z.object({
   title: z.string().min(3),
   description: z.string().min(10).optional(),
+  image_url: z.string().url().optional(),
   type: z.enum(['LIVE', 'COURSE']).optional(),
   start_date: dateSchema.optional(),
   end_date: dateSchema.optional(),
@@ -23,6 +24,7 @@ export const createBatchSchema = z.object({
 export const updateBatchSchema = z.object({
   title: z.string().min(3).optional(),
   description: z.string().min(10).optional(),
+  image_url: z.string().url().optional(),
   type: z.enum(['LIVE', 'COURSE']).optional(),
   start_date: dateSchema.optional(),
   end_date: dateSchema.optional(),

@@ -110,6 +110,7 @@ model Batch {
 
   title       String      @unique
   description String?
+  image_url   String?
   type        BatchType   @default(LIVE)
   start_date  DateTime?
   end_date    DateTime?
