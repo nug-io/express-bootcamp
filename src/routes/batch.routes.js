@@ -29,4 +29,20 @@ router.put(
   batchController.updateBatch
 );
 
+router.get('/:id/mentor', batchController.getBatchMentors);
+
+router.post(
+  '/:id/mentor',
+  authenticate,
+  authorize(['ADMIN']),
+  batchController.addBatchMentor
+);
+
+router.delete(
+  '/:batchId/mentor/:mentorId',
+  authenticate,
+  authorize(['ADMIN']),
+  batchController.removeBatchMentor
+);
+
 export default router;

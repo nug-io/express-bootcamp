@@ -16,6 +16,7 @@ export const createBatchSchema = z.object({
   quota: z.number().int().positive().optional(),
   price: z.number().positive(),
   tags: z.array(z.string()).optional(),
+  mentors: z.array(z.number().int()).optional(),
   status: z.enum(['ACTIVE', 'CLOSED']).optional(),
 });
 
@@ -28,5 +29,6 @@ export const updateBatchSchema = z.object({
   price: z.number().positive().optional(),
   quota: z.number().int().positive().optional(),
   tags: z.array(z.string()).optional(),
+  mentors: z.array(z.number().int()).optional(),
   status: z.enum(['ACTIVE', 'CLOSED']).optional(),
 });

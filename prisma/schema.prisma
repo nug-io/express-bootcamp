@@ -73,9 +73,24 @@ model MentorProfile {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  batches Batch[]
+  batches      Batch[]
+  batchMentors BatchMentor[]
 
   @@index([is_active])
+}
+
+model BatchMentor {
+  id        Int @id @default(autoincrement())
+  batch_id  Int
+  mentor_id Int
+
+  created_at DateTime  @default(now())
+  deleted_at DateTime?
+
+  batch  Batch         @relation(fields: [batch_id], references: [id])
+  mentor MentorProfile @relation(fields: [mentor_id], references: [id])
+
+  @@unique([batch_id, mentor_id])
 }
 
 model Tag {
@@ -106,6 +121,7 @@ model Batch {
   enrollments Enrollment[]
   materials   Material[]
   tags        BatchTag[]
+  mentors     BatchMentor[]
 }
 
 model BatchTag {

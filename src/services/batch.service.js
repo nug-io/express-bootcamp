@@ -145,6 +145,22 @@ export const getBatchById = async (id) => {
           tag: true,
         },
       },
+      mentors: {
+        where: { deleted_at: null },
+        include: {
+          mentor: {
+            select: {
+              id: true,
+              name: true,
+              bio: true,
+              avatar: true,
+              linkedin: true,
+              github: true,
+              website: true,
+            },
+          },
+        },
+      },
       _count: { select: { enrollments: true } },
     },
   });
@@ -156,6 +172,7 @@ export const getBatchById = async (id) => {
   return {
     ...batch,
     tags: batch.tags?.map((t) => t.tag.name) || [],
+    mentors: batch.mentors?.map((m) => m.mentor) || [],
     status_effective: resolveBatchStatus(batch),
     enrolled_count: batch._count.enrollments,
     is_full:
@@ -208,6 +225,7 @@ export const createBatch = async (data) => {
   }
 
   const tags = data.tags || [];
+  const mentors = data.mentors || [];
 
   const batch = await prisma.batch.create({
     data: {
@@ -221,6 +239,19 @@ export const createBatch = async (data) => {
       status: 'ACTIVE',
     },
   });
+
+  if (mentors.length) {
+    await Promise.all(
+      mentors.map((mentorId) =>
+        prisma.batchMentor.create({
+          data: {
+            batch_id: batch.id,
+            mentor_id: mentorId,
+          },
+        })
+      )
+    );
+  }
 
   if (tags.length) {
     await Promise.all(
@@ -249,7 +280,7 @@ export const createBatch = async (data) => {
 export const updateBatch = async (id, data) => {
   const batch = await getBatchById(id);
 
-  const { tags, ...batchData } = data;
+  const { tags, mentors, ...batchData } = data;
 
   if (data.title && data.title !== batch.title) {
     const existingBatch = await prisma.batch.findUnique({
@@ -310,18 +341,57 @@ export const updateBatch = async (id, data) => {
     );
   }
 
+  if (mentors) {
+    const batchId = parseInt(id);
+
+    // soft delete existing
+    await prisma.batchMentor.updateMany({
+      where: {
+        batch_id: batchId,
+        deleted_at: null,
+      },
+      data: {
+        deleted_at: new Date(),
+      },
+    });
+
+    // insert new mentors
+    await Promise.all(
+      mentors.map((mentorId) =>
+        prisma.batchMentor.create({
+          data: {
+            batch_id: batchId,
+            mentor_id: mentorId,
+          },
+        })
+      )
+    );
+  }
+
   const updated = await prisma.batch.update({
     where: { id: parseInt(id) },
     data: {
       ...batchData,
       start_date: startDate,
       end_date: endDate,
+      mentors: {
+        where: { deleted_at: null },
+        include: {
+          mentor: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
     },
   });
 
   return {
     ...updated,
     tags: tags || batch.tags,
+    mentors: batch.mentors?.map((m) => m.mentor) || [],
   };
 };
 
