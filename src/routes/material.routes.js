@@ -31,4 +31,13 @@ router.put(
 );
 router.delete('/:id', authorize(['ADMIN']), materialController.deleteMaterial);
 
+router.post('/:id/progress', materialController.updateProgress);
+
+router.get('/batch/:batchId/progress', materialController.getBatchProgress);
+
+router.get(
+  '/batch/:batchId/progress-summary',
+  materialController.getBatchProgressSummary
+);
+
 export default router;

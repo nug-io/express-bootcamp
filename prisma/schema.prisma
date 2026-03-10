@@ -41,9 +41,10 @@ model User {
   created_at    DateTime   @default(now())
   updated_at    DateTime   @updatedAt
 
-  enrollments   Enrollment[]
-  auditLogs     AuditLog[]
-  mentorProfile MentorProfile?
+  enrollments       Enrollment[]
+  auditLogs         AuditLog[]
+  mentorProfile     MentorProfile?
+  material_progress MaterialProgress[]
 
   @@index([role])
   @@index([status])
@@ -164,6 +165,24 @@ model Material {
   video_url  String?
 
   batch Batch @relation(fields: [batch_id], references: [id])
+
+  progress MaterialProgress[]
+}
+
+model MaterialProgress {
+  id          Int @id @default(autoincrement())
+  user_id     Int
+  material_id Int
+
+  completed Boolean @default(false)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user     User     @relation(fields: [user_id], references: [id])
+  material Material @relation(fields: [material_id], references: [id])
+
+  @@unique([user_id, material_id])
 }
 
 model AuditLog {

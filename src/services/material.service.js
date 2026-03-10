@@ -101,3 +101,71 @@ const ensurePaidEnrollment = async (userId, batchId) => {
     throwError('Access denied', 403);
   }
 };
+
+export const updateMaterialProgress = async (materialId, userId) => {
+  const material = await prisma.material.findUnique({
+    where: { id: parseInt(materialId) },
+  });
+
+  if (!material) {
+    throwError('Material not found', 404);
+  }
+
+  await ensurePaidEnrollment(userId, material.batch_id);
+
+  return prisma.materialProgress.upsert({
+    where: {
+      user_id_material_id: {
+        user_id: userId,
+        material_id: material.id,
+      },
+    },
+    update: {
+      completed: true,
+    },
+    create: {
+      user_id: userId,
+      material_id: material.id,
+      completed: true,
+    },
+  });
+};
+
+export const getBatchProgress = async (batchId, userId) => {
+  const materials = await prisma.material.findMany({
+    where: { batch_id: parseInt(batchId) },
+    select: { id: true },
+  });
+
+  const progress = await prisma.materialProgress.findMany({
+    where: {
+      user_id: userId,
+      material_id: { in: materials.map((m) => m.id) },
+    },
+  });
+
+  return progress;
+};
+
+export const getBatchProgressSummary = async (batchId, userId) => {
+  const totalMaterials = await prisma.material.count({
+    where: { batch_id: parseInt(batchId) },
+  });
+
+  const completed = await prisma.materialProgress.count({
+    where: {
+      user_id: userId,
+      completed: true,
+      material: {
+        batch_id: parseInt(batchId),
+      },
+    },
+  });
+
+  return {
+    total_materials: totalMaterials,
+    completed,
+    progress_percent:
+      totalMaterials === 0 ? 0 : Math.round((completed / totalMaterials) * 100),
+  };
+};

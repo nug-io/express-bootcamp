@@ -64,3 +64,45 @@ export const deleteMaterial = async (req, res, next) => {
     next(error);
   }
 };
+
+export const updateProgress = async (req, res, next) => {
+  try {
+    const data = await materialService.updateMaterialProgress(
+      req.params.id,
+      req.user.id
+    );
+
+    res.json({
+      message: 'Material completed',
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getBatchProgress = async (req, res, next) => {
+  try {
+    const data = await materialService.getBatchProgress(
+      req.params.batchId,
+      req.user.id
+    );
+
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getBatchProgressSummary = async (req, res, next) => {
+  try {
+    const data = await materialService.getBatchProgressSummary(
+      req.params.batchId,
+      req.user.id
+    );
+
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+};
