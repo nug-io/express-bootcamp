@@ -30,8 +30,16 @@ export const getUser = async (req, res, next) => {
 };
 
 export const updateUserRole = async (req, res, next) => {
+  if (req.user.id === parseInt(req.params.id)) {
+    throwError('You cannot change your own role', 400);
+  }
+
   try {
-    const user = await userService.updateUserRole(req.params.id, req.body.role);
+    const user = await userService.updateUserRole(
+      req.user.id,
+      req.params.id,
+      req.body.role
+    );
 
     res.json({
       message: 'User role updated',

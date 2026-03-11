@@ -5,8 +5,8 @@ import { createPayment } from './midtrans.service.js';
 
 export const enrollUser = async (userId, batchId) => {
   // 1. Ambil batch + jumlah enrollment
-  const batch = await prisma.batch.findUnique({
-    where: { id: batchId },
+  const batch = await prisma.batch.findFirst({
+    where: { id: batchId, deleted_at: null },
     include: {
       _count: {
         select: { enrollments: true },
@@ -26,12 +26,12 @@ export const enrollUser = async (userId, batchId) => {
   const now = new Date();
 
   // 3. Batch harus belum mulai
-  if (now >= batch.start_date) {
+  if (batch.start_date && now >= batch.start_date) {
     throwError('Batch is not open for enrollment', 400);
   }
 
   // 4. Cek kuota
-  if (batch._count.enrollments >= batch.quota) {
+  if (batch.quota && batch._count.enrollments >= batch.quota) {
     throwError('Batch quota is full', 409);
   }
 
@@ -51,7 +51,7 @@ export const enrollUser = async (userId, batchId) => {
 
   if (existingEnrollment) {
     if (existingEnrollment.payment_status === 'PAID') {
-      throwError('User already enrolled in this batch', 409);
+      throwError('User already joined in this batch', 409);
     }
 
     if (existingEnrollment.payment_status === 'PENDING') {
@@ -148,8 +148,8 @@ export const getBatchParticipants = async (query = {}) => {
 
   // 1. Validasi batch
   if (batchId) {
-    const batch = await prisma.batch.findUnique({
-      where: { id: batchId },
+    const batch = await prisma.batch.findFirst({
+      where: { id: batchId, deleted_at: null },
       select: { id: true },
     });
 
@@ -285,9 +285,8 @@ SELECT
     AND expires_at <= NOW()
   ) AS pending_expired
 
-FROM "Enrollment"
-WHERE
-  ${batchId ? Prisma.sql`batch_id = ${batchId}` : Prisma.sql`TRUE`};
+  FROM "Enrollment"
+  ${batchId ? Prisma.sql`WHERE batch_id = ${batchId}` : Prisma.sql``};
 `;
 
   const summary = {

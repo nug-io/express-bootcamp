@@ -102,7 +102,11 @@ export const getUserById = async (id) => {
   return user;
 };
 
-export const updateUserRole = async (id, role) => {
+export const updateUserRole = async (currentAdminId, id, role) => {
+  if (parseInt(id) === currentAdminId) {
+    throwError('Admin cannot change own role', 400);
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: parseId(id) },
   });

@@ -23,12 +23,15 @@ export const getAllBatches = async (query = {}) => {
   const skip = (page - 1) * limit;
 
   // 1. DB-level filter
-  const where = buildBatchFilters({
-    keyword,
-    type,
-    tags,
-    tagMode,
-  });
+  const where = {
+    deleted_at: null,
+    ...buildBatchFilters({
+      keyword,
+      type,
+      tags,
+      tagMode,
+    }),
+  };
 
   // 2. Query DB (TABLE DATA)
   const { data: batches, total } = await listQuery({
@@ -91,7 +94,7 @@ export const getAllBatches = async (query = {}) => {
     ) AS full
 
   FROM "Batch"
-  WHERE
+  WHERE deleted_at IS NULL
     ${
       keyword
         ? Prisma.sql`title ILIKE ${'%' + keyword + '%'}`
@@ -137,8 +140,8 @@ export const getAllBatches = async (query = {}) => {
 };
 
 export const getBatchById = async (id) => {
-  const batch = await prisma.batch.findUnique({
-    where: { id: parseInt(id) },
+  const batch = await prisma.batch.findFirst({
+    where: { id: parseInt(id), deleted_at: null },
     include: {
       materials: true,
       tags: {
@@ -392,11 +395,46 @@ export const updateBatch = async (id, data) => {
     },
   });
 
+  const mentorsData = await prisma.batchMentor.findMany({
+    where: {
+      batch_id: parseInt(id),
+      deleted_at: null,
+    },
+    include: {
+      mentor: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
   return {
     ...updated,
     tags: tags || batch.tags,
-    mentors: batch.mentors?.map((m) => m.mentor) || [],
+    mentors: mentorsData?.map((m) => m.mentor) || [],
   };
+};
+
+export const deleteBatch = async (id) => {
+  const batch = await prisma.batch.findFirst({
+    where: {
+      id: parseInt(id),
+      deleted_at: null,
+    },
+  });
+
+  if (!batch) {
+    throwError('Batch not found', 404);
+  }
+
+  return prisma.batch.update({
+    where: { id: batch.id },
+    data: {
+      deleted_at: new Date(),
+    },
+  });
 };
 
 function normalizeBatchQuery(query) {
@@ -533,6 +571,11 @@ async function getBatchTypeSummary() {
 async function getBatchTagSummary() {
   const rows = await prisma.batchTag.groupBy({
     by: ['tag_id'],
+    where: {
+      batch: {
+        deleted_at: null,
+      },
+    },
     _count: { batch_id: true },
   });
 
@@ -546,9 +589,11 @@ async function getBatchTagSummary() {
     summary[tag.name] = 0;
   });
 
+  const tagMap = Object.fromEntries(tags.map((t) => [t.id, t.name]));
+
   rows.forEach((row) => {
-    const tag = tags.find((t) => t.id === row.tag_id);
-    if (tag) summary[tag.name] = row._count.batch_id;
+    const name = tagMap[row.tag_id];
+    if (name) summary[name] = row._count.batch_id;
   });
 
   return summary;

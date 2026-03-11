@@ -49,6 +49,7 @@ model User {
   @@index([role])
   @@index([status])
   @@index([email])
+  @@index([deleted_at])
 }
 
 model MentorProfile {
@@ -92,6 +93,7 @@ model BatchMentor {
   mentor MentorProfile @relation(fields: [mentor_id], references: [id])
 
   @@unique([batch_id, mentor_id])
+  @@index([deleted_at])
 }
 
 model Tag {
@@ -117,13 +119,17 @@ model Batch {
   price       Int
   quota       Int?
   status      BatchStatus @default(ACTIVE)
-  created_at  DateTime    @default(now())
-  updated_at  DateTime    @updatedAt
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
 
   enrollments Enrollment[]
   materials   Material[]
   tags        BatchTag[]
   mentors     BatchMentor[]
+
+  @@index([deleted_at])
 }
 
 model BatchTag {
@@ -156,18 +162,22 @@ model Enrollment {
 }
 
 model Material {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   title      String
-  content    String   @db.Text
+  content    String    @db.Text
   batch_id   Int
   order      Int
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
   video_url  String?
 
   batch Batch @relation(fields: [batch_id], references: [id])
 
   progress MaterialProgress[]
+
+  @@unique([batch_id, order])
+  @@index([deleted_at])
 }
 
 model MaterialProgress {

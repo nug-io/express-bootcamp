@@ -23,6 +23,7 @@ export const register = async (data) => {
       password_hash: hashedPassword,
       phone_number,
       role: 'USER',
+      status: 'ACTIVE',
     },
   });
 
@@ -38,6 +39,14 @@ export const login = async ({ email, password }) => {
 
   if (!user) {
     throwError('Invalid credentials', 401);
+  }
+
+  if (user.status !== 'ACTIVE') {
+    throwError('Account not active', 403);
+  }
+
+  if (user.deleted_at) {
+    throwError('Account deleted', 403);
   }
 
   const isValid = await comparePassword(password, user.password_hash);
