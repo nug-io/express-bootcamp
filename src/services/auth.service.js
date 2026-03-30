@@ -59,3 +59,13 @@ export const login = async ({ email, password }) => {
 
   return { user, token };
 };
+
+export const refresh = async (user) => {
+  // re-generate token saja
+  const token = generateToken({
+    id: user.id,
+    role: user.role,
+  });
+
+  return token;
+};

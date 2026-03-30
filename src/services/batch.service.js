@@ -43,7 +43,8 @@ export const getAllBatches = async (query = {}) => {
       },
       _count: { select: { enrollments: true } },
     },
-    orderBy: orderDir,
+    orderBy:
+      orderBy === 'remaining_quota' ? undefined : { [orderBy]: orderDir },
     skip,
     take: limit,
   });
@@ -97,8 +98,8 @@ export const getAllBatches = async (query = {}) => {
   WHERE deleted_at IS NULL
     ${
       keyword
-        ? Prisma.sql`title ILIKE ${'%' + keyword + '%'}`
-        : Prisma.sql`TRUE`
+        ? Prisma.sql`AND title ILIKE ${'%' + keyword + '%'}`
+        : Prisma.empty
     };
 `;
 
@@ -304,26 +305,45 @@ export const updateBatch = async (id, data) => {
     throwError('Cannot change dates after batch has started', 400);
   }
 
-  const startDate = data.start_date
-    ? new Date(data.start_date)
-    : new Date(batch.start_date);
+  let startDate;
+  let endDate;
 
-  const endDate = data.end_date
-    ? new Date(data.end_date)
-    : new Date(batch.end_date);
+  if (data.start_date || data.end_date) {
+    startDate = data.start_date
+      ? new Date(data.start_date)
+      : new Date(batch.start_date);
 
-  startDate.setHours(0, 0, 0, 0);
-  endDate.setHours(23, 59, 59, 999);
+    endDate = data.end_date
+      ? new Date(data.end_date)
+      : new Date(batch.end_date);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
 
-  if (startDate < today) {
-    throwError('Batch cannot start in the past', 400);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (startDate < today) {
+      throwError('Batch cannot start in the past', 400);
+    }
+
+    if (endDate < startDate) {
+      throwError('End date must be after start date', 400);
+    }
   }
 
-  if (endDate < startDate) {
-    throwError('End date must be after start date', 400);
+  const updateData = {
+    ...batchData,
+  };
+
+  // hanya inject kalau ada
+  if (startDate) updateData.start_date = startDate;
+  if (endDate) updateData.end_date = endDate;
+
+  // COURSE override
+  if (batch.type === 'COURSE') {
+    delete updateData.start_date;
+    delete updateData.end_date;
   }
 
   if (tags) {
@@ -377,22 +397,7 @@ export const updateBatch = async (id, data) => {
 
   const updated = await prisma.batch.update({
     where: { id: parseInt(id) },
-    data: {
-      ...batchData,
-      start_date: startDate,
-      end_date: endDate,
-      mentors: {
-        where: { deleted_at: null },
-        include: {
-          mentor: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-      },
-    },
+    data: updateData,
   });
 
   const mentorsData = await prisma.batchMentor.findMany({

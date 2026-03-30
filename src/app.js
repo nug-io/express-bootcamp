@@ -15,7 +15,27 @@ import mentorRoutes from './routes/mentor.routes.js';
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',')
+  : [];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // allow server-to-server / postman
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked: ${origin}`));
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

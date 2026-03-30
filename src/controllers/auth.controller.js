@@ -39,3 +39,29 @@ export const login = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getSession = async (req, res, next) => {
+  try {
+    res.json({
+      message: 'Session valid',
+      data: {
+        user: req.user,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refresh = async (req, res, next) => {
+  try {
+    const token = await authService.refresh(req.user);
+
+    res.json({
+      message: 'Token refreshed',
+      data: { token },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
